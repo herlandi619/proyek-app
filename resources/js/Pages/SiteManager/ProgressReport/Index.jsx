@@ -11,17 +11,17 @@ export default function Index({ auth, reports, workItems, filters }) {
     const [isEdit, setIsEdit] = useState(false);
     const [currentId, setCurrentId] = useState(null);
 
-    // Inertia useForm
     const { data, setData, post, delete: destroy, reset, errors, clearErrors, processing } = useForm({
-        _method: 'post', // Default POST, diubah menjadi PUT saat update (Spoofing)
+        _method: 'post', 
         work_item_id: '',
         tanggal_laporan: '',
         persentase_progres: '',
         catatan: '',
-        foto: null // menampung FileList
+        foto: null
     });
 
     useEffect(() => {
+        // Handle Success Message
         if (flash?.message) {
             Swal.fire({
                 icon: 'success',
@@ -29,6 +29,15 @@ export default function Index({ auth, reports, workItems, filters }) {
                 text: flash.message,
                 timer: 2000,
                 showConfirmButton: false
+            });
+        }
+        // Handle Error Message (Pencegahan Edit/Hapus saat status Approved)
+        if (flash?.error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal',
+                text: flash.error,
+                showConfirmButton: true
             });
         }
     }, [flash]);
@@ -50,7 +59,7 @@ export default function Index({ auth, reports, workItems, filters }) {
         setIsEdit(true);
         setCurrentId(report.id);
         setData({
-            _method: 'put', // Spoofing agar Laravel memproses multipart/form-data
+            _method: 'put', 
             work_item_id: report.work_item_id,
             tanggal_laporan: report.tanggal_laporan,
             persentase_progres: report.persentase_progres,
@@ -85,14 +94,13 @@ export default function Index({ auth, reports, workItems, filters }) {
             cancelButtonText: 'Batal'
         }).then((result) => {
             if (result.isConfirmed) {
-                // Baik create maupun edit kita lempar menggunakan `post` untuk menangani form-data
                 const submitRoute = isEdit 
                     ? route('site-manager.progress-reports.update', currentId) 
                     : route('site-manager.progress-reports.store');
 
                 post(submitRoute, {
                     preserveScroll: true,
-                    forceFormData: true, // Wajib untuk file upload
+                    forceFormData: true, 
                     onSuccess: () => closeModal(),
                     onError: () => Swal.fire('Gagal!', 'Periksa kembali isian form Anda.', 'error')
                 });
@@ -177,6 +185,7 @@ export default function Index({ auth, reports, workItems, filters }) {
                                             <th className="px-6 py-3">Proyek & Item Pekerjaan</th>
                                             <th className="px-6 py-3">Tanggal</th>
                                             <th className="px-6 py-3">Persentase</th>
+                                            <th className="px-6 py-3">Status</th>
                                             <th className="px-6 py-3">Dokumentasi</th>
                                             <th className="px-6 py-3 text-center">Aksi</th>
                                         </tr>
@@ -195,6 +204,11 @@ export default function Index({ auth, reports, workItems, filters }) {
                                                         <span className="font-bold text-blue-600">{report.persentase_progres}%</span>
                                                     </td>
                                                     <td className="px-6 py-4">
+                                                        {report.status === 'approved' && <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Disetujui</span>}
+                                                        {report.status === 'rejected' && <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Ditolak</span>}
+                                                        {(!report.status || report.status === 'pending') && <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-bold">Menunggu Validasi</span>}
+                                                    </td>
+                                                    <td className="px-6 py-4">
                                                         <div className="flex -space-x-2">
                                                             {report.progress_photos?.length > 0 ? (
                                                                 report.progress_photos.map((photo) => (
@@ -211,25 +225,32 @@ export default function Index({ auth, reports, workItems, filters }) {
                                                             )}
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-center">
-                                                        <button 
-                                                            onClick={() => openEditModal(report)}
-                                                            className="text-yellow-600 hover:text-yellow-800 bg-yellow-100 px-3 py-1 rounded mr-2"
-                                                        >
-                                                            Edit
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleDelete(report.id)}
-                                                            className="text-red-600 hover:text-red-800 bg-red-100 px-3 py-1 rounded"
-                                                        >
-                                                            Hapus
-                                                        </button>
+                                                    <td className="px-6 py-4 text-center whitespace-nowrap">
+                                                        {/* Menyembunyikan tombol Edit & Hapus jika status Approved */}
+                                                        {report.status !== 'approved' ? (
+                                                            <>
+                                                                <button 
+                                                                    onClick={() => openEditModal(report)}
+                                                                    className="text-yellow-600 hover:text-yellow-800 bg-yellow-100 px-3 py-1 rounded mr-2"
+                                                                >
+                                                                    Edit
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handleDelete(report.id)}
+                                                                    className="text-red-600 hover:text-red-800 bg-red-100 px-3 py-1 rounded"
+                                                                >
+                                                                    Hapus
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-400 italic">Terkunci (Disetujui)</span>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                                                <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
                                                     Belum ada laporan progres yang diinputkan.
                                                 </td>
                                             </tr>
@@ -284,16 +305,16 @@ export default function Index({ auth, reports, workItems, filters }) {
                                 <select
                                     value={data.work_item_id}
                                     onChange={(e) => setData('work_item_id', e.target.value)}
-                                    disabled={isEdit} // Disarankan tidak mengubah item jika sedang diedit
+                                    disabled={isEdit} 
                                     className={`w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${errors.work_item_id ? 'border-red-500' : ''}`}
                                 >
                                     <option value="">-- Pilih Item Pekerjaan --</option>
                                     {workItems.map((item) => (
                                         <option key={item.id} value={item.id}>
-                                            {item.project.nama_proyek} - {item.nama_item}
+                                            {item.project?.nama_proyek} - {item.nama_item}
                                         </option>  
                                     ))}
-                                </select>
+                                </select> 
                                 {errors.work_item_id && <span className="text-red-500 text-xs">{errors.work_item_id}</span>}
                             </div>
 
@@ -350,7 +371,7 @@ export default function Index({ auth, reports, workItems, filters }) {
                                     onChange={handleFileChange}
                                     className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-300 rounded-md p-1"
                                 />
-                                <p className="text-xs text-gray-400 mt-1">Bisa memilih lebih dari 1 foto (Max 5MB/foto).</p>
+                                <p className="text-xs text-gray-400 mt-1">Bisa memilih lebih dari 1 foto (Max 5MB/foto). Biarkan kosong jika tidak ingin mengubah foto pada mode edit.</p>
                                 {errors.foto && <span className="text-red-500 text-xs">{errors.foto}</span>}
                                 {errors['foto.0'] && <span className="text-red-500 text-xs">{errors['foto.0']}</span>}
                             </div>
@@ -378,4 +399,4 @@ export default function Index({ auth, reports, workItems, filters }) {
             )}
         </SiteManagerLayout>
     );
-} 
+}

@@ -105,6 +105,8 @@ Route::middleware(['auth'])
 
         // 1. DASHBOARD URI: /pimpinan/dashboard | Name: pimpinan.dashboard
         Route::get('/dashboard', [PimpinanDashboardController::class, 'index'])->name('dashboard'); 
+        // Rute manual khusus untuk Aksi Setujui/Tolak oleh Pimpinan
+        Route::put('/progress-reports/{progressReport}/status', [PimpinanDashboardController::class, 'updateStatus'])->name('progress-reports.update-status');
 
         // 2. Data Proyek Real-Time
         Route::get('/monitoring-proyek', [PimpinanMonitoringController::class, 'index'])->name('monitoring-proyek.index');

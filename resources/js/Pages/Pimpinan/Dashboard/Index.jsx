@@ -7,33 +7,29 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 export default function Index({ auth, projects, summary, filters }) {
     const { flash } = usePage().props;
     
-    // State untuk Search
     const [searchTerm, setSearchTerm] = useState(filters.search || '');
-
-    // State Modal Detail Proyek
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedProject, setSelectedProject] = useState(null);
 
-    // SweetAlert Flash Message Listener
     useEffect(() => {
         if (flash?.message) {
             Swal.fire({
-                icon: flash.type || 'info',
-                title: 'Informasi',
+                icon: 'success',
+                title: 'Berhasil',
                 text: flash.message,
                 timer: 2500,
                 showConfirmButton: false
             });
+            // Tutup modal secara otomatis jika ada aksi validasi sukses
+            setIsModalOpen(false);
         }
     }, [flash]);
 
-    // Handle Search
     const handleSearch = (e) => {
         e.preventDefault();
         router.get(route('pimpinan.dashboard'), { search: searchTerm }, { preserveState: true, replace: true });
     };
 
-    // Modal Handlers
     const openDetailModal = (project) => {
         setSelectedProject(project);
         setIsModalOpen(true);
@@ -44,22 +40,49 @@ export default function Index({ auth, projects, summary, filters }) {
         setSelectedProject(null);
     };
 
-    // Fungsi kalkulasi progres proyek secara real-time dari data relasi
+    // Fungsi kalkulasi progres real-time, HANYA menghitung laporan berstatus 'approved'
     const calculateProjectProgress = (project) => {
         if (!project.work_items || project.work_items.length === 0) return 0;
         
         let totalProgress = 0;
         project.work_items.forEach(item => {
             if (item.progress_reports && item.progress_reports.length > 0) {
-                const latestReport = item.progress_reports[item.progress_reports.length - 1];
-                totalProgress += parseFloat(latestReport.persentase_progres);
+                // Saring laporan untuk hanya mengambil yang disetujui
+                const approvedReports = item.progress_reports.filter(r => r.status === 'approved');
+                if (approvedReports.length > 0) {
+                    const latestApprovedReport = approvedReports[approvedReports.length - 1];
+                    totalProgress += parseFloat(latestApprovedReport.persentase_progres);
+                }
             }
         });
 
         return parseFloat((totalProgress / project.work_items.length).toFixed(2));
     };
 
-    // Menyiapkan data untuk Recharts
+    // Fungsi Aksi Validasi Laporan (Approve/Reject)
+    const handleStatusUpdate = (reportId, newStatus) => {
+        Swal.fire({
+            title: newStatus === 'approved' ? 'Setujui Laporan?' : 'Tolak Laporan?',
+            text: newStatus === 'approved' 
+                ? "Nilai progres akan ditambahkan secara permanen ke grafik proyek." 
+                : "Laporan akan dikembalikan ke Site Manager untuk direvisi.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: newStatus === 'approved' ? '#10b981' : '#ef4444',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Ya, Lanjutkan',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                router.put(route('pimpinan.progress-reports.update-status', reportId), {
+                    status: newStatus
+                }, {
+                    preserveScroll: true
+                });
+            }
+        });
+    };
+
     const chartData = projects.data.map((project) => ({
         name: project.nama_proyek.length > 15 ? project.nama_proyek.substring(0, 15) + '...' : project.nama_proyek,
         fullName: project.nama_proyek,
@@ -98,7 +121,7 @@ export default function Index({ auth, projects, summary, filters }) {
                                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                             </div>
                             <div>
-                                <p className="text-gray-500 text-sm font-medium">Rata-Rata Progres Keseluruhan</p>
+                                <p className="text-gray-500 text-sm font-medium">Progres Tervalidasi (Rata-rata)</p>
                                 <p className="text-2xl font-bold text-gray-800">{summary.average_progress}%</p>
                             </div>
                         </div>
@@ -106,7 +129,7 @@ export default function Index({ auth, projects, summary, filters }) {
 
                     {/* Grafik Visualisasi Recharts */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 mb-8">
-                        <h3 className="text-lg font-bold text-gray-800 mb-4">Grafik Progres Proyek (Real-Time)</h3>
+                        <h3 className="text-lg font-bold text-gray-800 mb-4">Grafik Progres Proyek (Valid)</h3>
                         <div className="w-full h-80">
                             {chartData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
@@ -140,7 +163,7 @@ export default function Index({ auth, projects, summary, filters }) {
                     <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                         <div className="p-6">
                             <div className="flex flex-col md:flex-row justify-between items-center mb-6">
-                                <h3 className="text-lg font-bold text-gray-800">Monitoring Proyek Real-Time</h3>
+                                <h3 className="text-lg font-bold text-gray-800">Monitoring & Validasi Laporan Proyek</h3>
                                 
                                 <div className="flex gap-4 w-full md:w-auto mt-4 md:mt-0">
                                     <form onSubmit={handleSearch} className="flex">
@@ -166,8 +189,8 @@ export default function Index({ auth, projects, summary, filters }) {
                                             <th className="px-6 py-3">Nama Proyek</th>
                                             <th className="px-6 py-3">Site Manager</th>
                                             <th className="px-6 py-3">Timeline</th>
-                                            <th className="px-6 py-3">Progres Real-Time</th>
-                                            <th className="px-6 py-3 text-center">Aksi</th>
+                                            <th className="px-6 py-3">Progres (Valid)</th>
+                                            <th className="px-6 py-3 text-center">Aksi Validasi</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -193,9 +216,9 @@ export default function Index({ auth, projects, summary, filters }) {
                                                         <td className="px-6 py-4 flex justify-center gap-2">
                                                             <button 
                                                                 onClick={() => openDetailModal(project)} 
-                                                                className="text-blue-600 hover:text-blue-800 font-medium bg-blue-100 px-3 py-1 rounded"
+                                                                className="text-blue-600 hover:text-blue-800 font-medium bg-blue-100 px-3 py-1 rounded shadow-sm"
                                                             >
-                                                                Detail Laporan
+                                                                Tinjau Laporan
                                                             </button>
                                                         </td>
                                                     </tr>
@@ -231,58 +254,102 @@ export default function Index({ auth, projects, summary, filters }) {
                 </div>
             </div>
 
-            {/* Modal Box View Detail Progress (Read-Only) */}
+            {/* Modal Box View Detail Progress (Approve/Reject) */}
             {isModalOpen && selectedProject && (
-                <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="bg-white rounded-lg w-full max-w-2xl p-6 m-4 shadow-xl">
-                        <div className="flex justify-between items-center mb-5">
-                            <h3 className="text-xl font-bold text-gray-900">Rincian Laporan Proyek</h3>
+                <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-black bg-opacity-60 p-4">
+                    <div className="bg-white rounded-lg w-full max-w-3xl shadow-xl overflow-hidden">
+                        <div className="flex justify-between items-center p-5 border-b bg-gray-50">
+                            <h3 className="text-lg font-bold text-gray-900">Validasi Laporan Proyek</h3>
                             <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                         </div>
                         
-                        <div className="mb-4 pb-4 border-b">
-                            <h4 className="font-semibold text-lg">{selectedProject.nama_proyek}</h4>
-                            <p className="text-sm text-gray-500">Penanggung Jawab: {selectedProject.site_manager?.name || '-'}</p>
-                        </div>
+                        <div className="p-6">
+                            <div className="mb-4 pb-4 border-b">
+                                <h4 className="font-bold text-lg text-indigo-700">{selectedProject.nama_proyek}</h4>
+                                <p className="text-sm text-gray-600 mt-1">Penanggung Jawab (Site Manager): <strong>{selectedProject.site_manager?.name || '-'}</strong></p>
+                            </div>
 
-                        <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
-                            {selectedProject.work_items && selectedProject.work_items.length > 0 ? (
-                                selectedProject.work_items.map((item, index) => {
-                                    const latestReport = item.progress_reports && item.progress_reports.length > 0 
-                                        ? item.progress_reports[item.progress_reports.length - 1] 
-                                        : null;
+                            <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                                {selectedProject.work_items && selectedProject.work_items.length > 0 ? (
+                                    selectedProject.work_items.map((item, index) => {
+                                        // Mengambil laporan terakhir (terlepas statusnya) untuk diverifikasi Pimpinan
+                                        const latestReport = item.progress_reports && item.progress_reports.length > 0 
+                                            ? item.progress_reports[item.progress_reports.length - 1] 
+                                            : null;
 
-                                    return (
-                                        <div key={index} className="p-4 bg-gray-50 rounded-lg border">
-                                            <div className="flex justify-between font-semibold mb-2 text-gray-800">
-                                                <span>{item.nama_item}</span>
-                                                <span className={latestReport?.persentase_progres === '100.00' ? 'text-green-600' : 'text-blue-600'}>
-                                                    {latestReport ? `${latestReport.persentase_progres}%` : '0%'}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-gray-500 mb-2">{item.deskripsi}</p>
-                                            
-                                            {latestReport ? (
-                                                <div className="text-xs text-gray-600 mt-2 pt-2 border-t border-gray-200">
-                                                    <span className="font-medium text-gray-700">Pembaruan Terakhir:</span> {latestReport.tanggal_laporan} <br/>
-                                                    <span className="font-medium text-gray-700">Catatan Pekerjaan:</span> {latestReport.catatan || 'Tidak ada catatan.'}
+                                        return (
+                                            <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <h5 className="font-bold text-gray-800">{item.nama_item}</h5>
+                                                        <p className="text-xs text-gray-500">{item.deskripsi}</p>
+                                                    </div>
+                                                    {latestReport && (
+                                                        <div className="text-right">
+                                                            <span className="text-lg font-bold text-blue-600">{latestReport.persentase_progres}%</span>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            ) : (
-                                                <span className="text-xs text-red-500 italic">Belum ada laporan masuk.</span>
-                                            )}
-                                        </div>
-                                    );
-                                })
-                            ) : (
-                                <div className="text-center text-gray-500 py-4">Belum ada item pekerjaan di proyek ini.</div>
-                            )}
+                                                
+                                                {latestReport ? (
+                                                    <div className="mt-3 pt-3 border-t border-gray-200">
+                                                        <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                                                            <div>
+                                                                <span className="text-gray-500 block">Tanggal Laporan:</span>
+                                                                <span className="font-medium text-gray-800">{latestReport.tanggal_laporan}</span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-gray-500 block">Status Saat Ini:</span>
+                                                                {latestReport.status === 'approved' && <span className="text-green-600 font-bold uppercase text-xs">Disetujui</span>}
+                                                                {latestReport.status === 'rejected' && <span className="text-red-600 font-bold uppercase text-xs">Ditolak</span>}
+                                                                {(!latestReport.status || latestReport.status === 'pending') && <span className="text-yellow-600 font-bold uppercase text-xs">Menunggu Validasi</span>}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-sm mb-4">
+                                                            <span className="text-gray-500 block">Catatan Deviasi:</span>
+                                                            <span className="font-medium text-gray-800 italic">{latestReport.catatan || 'Tidak ada catatan.'}</span>
+                                                        </div>
+
+                                                        {/* Tombol Aksi Persetujuan jika status masih Pending */}
+                                                        {(!latestReport.status || latestReport.status === 'pending') && (
+                                                            <div className="flex gap-2 mt-4 bg-white p-3 rounded border">
+                                                                <p className="text-xs text-gray-500 w-full flex items-center">Aksi untuk laporan ini:</p>
+                                                                <button 
+                                                                    onClick={() => handleStatusUpdate(latestReport.id, 'approved')}
+                                                                    className="bg-green-500 text-white px-4 py-1.5 text-sm font-medium rounded hover:bg-green-600 transition-colors whitespace-nowrap"
+                                                                >
+                                                                    Setujui Laporan
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handleStatusUpdate(latestReport.id, 'rejected')}
+                                                                    className="bg-red-500 text-white px-4 py-1.5 text-sm font-medium rounded hover:bg-red-600 transition-colors whitespace-nowrap"
+                                                                >
+                                                                    Tolak Laporan
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-2 pt-2 border-t border-gray-200">
+                                                        <span className="text-xs text-red-500 italic">Site Manager belum menginput laporan untuk item ini.</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="text-center text-gray-500 py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                                        Belum ada item pekerjaan di proyek ini.
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="mt-6 flex justify-end gap-3">
-                            <button type="button" onClick={closeModal} className="bg-gray-100 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-200">
-                                Tutup
+                        <div className="bg-gray-50 px-6 py-4 flex justify-end border-t">
+                            <button type="button" onClick={closeModal} className="bg-white border border-gray-300 px-5 py-2 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-100">
+                                Tutup Panel
                             </button>
                         </div>
                     </div>

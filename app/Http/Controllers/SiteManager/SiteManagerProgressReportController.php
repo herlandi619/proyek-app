@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
- 
+
 class SiteManagerProgressReportController extends Controller
 {
     public function index(Request $request)
@@ -54,7 +54,7 @@ class SiteManagerProgressReportController extends Controller
             'persentase_progres' => 'required|numeric|min:0|max:100',
             'catatan' => 'nullable|string',
             'foto' => 'nullable|array',
-            'foto.*' => 'image|mimes:jpeg,png,jpg|max:5120' // Max 5MB per foto
+            'foto.*' => 'image|mimes:jpeg,png,jpg|max:5120'
         ]);
 
         $report = ProgressReport::create([
@@ -63,9 +63,9 @@ class SiteManagerProgressReportController extends Controller
             'tanggal_laporan' => $request->tanggal_laporan,
             'persentase_progres' => $request->persentase_progres,
             'catatan' => $request->catatan,
+            'status' => 'pending', // Default saat create
         ]);
 
-        // Handle multi-upload foto
         if ($request->hasFile('foto')) {
             foreach ($request->file('foto') as $file) {
                 $path = $file->store('progress_photos', 'public');
@@ -76,11 +76,16 @@ class SiteManagerProgressReportController extends Controller
             }
         }
 
-        return back()->with('message', 'Laporan progres berhasil disimpan!');
+        return back()->with('message', 'Laporan progres berhasil disimpan dan menunggu validasi!');
     }
 
     public function update(Request $request, ProgressReport $progressReport)
     {
+        // VALIDASI KEAMANAN: Cek apakah laporan sudah di-approve
+        if ($progressReport->status === 'approved') {
+            return back()->with('error', 'Akses ditolak! Laporan yang sudah disetujui tidak dapat diubah.');
+        }
+
         $request->validate([
             'work_item_id' => 'required|exists:work_items,id',
             'tanggal_laporan' => 'required|date',
@@ -95,9 +100,9 @@ class SiteManagerProgressReportController extends Controller
             'tanggal_laporan' => $request->tanggal_laporan,
             'persentase_progres' => $request->persentase_progres,
             'catatan' => $request->catatan,
+            'status' => 'pending', // Kembalikan ke pending jika laporan di-edit setelah direject
         ]);
 
-        // Tambah foto baru jika ada upload di mode edit
         if ($request->hasFile('foto')) {
             foreach ($request->file('foto') as $file) {
                 $path = $file->store('progress_photos', 'public');
@@ -113,7 +118,11 @@ class SiteManagerProgressReportController extends Controller
 
     public function destroy(ProgressReport $progressReport)
     {
-        // Hapus file fisik foto sebelum menghapus record dari DB (opsional tapi disarankan)
+        // VALIDASI KEAMANAN: Cek apakah laporan sudah di-approve
+        if ($progressReport->status === 'approved') {
+            return back()->with('error', 'Akses ditolak! Laporan yang sudah disetujui tidak dapat dihapus.');
+        }
+
         foreach ($progressReport->progressPhotos as $photo) {
             Storage::disk('public')->delete($photo->path_foto);
         }

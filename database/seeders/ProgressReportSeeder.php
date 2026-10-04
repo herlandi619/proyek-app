@@ -16,8 +16,9 @@ class ProgressReportSeeder extends Seeder
                 'tanggal_laporan' => '2026-10-05',
                 'persentase_progres' => 100.00,
                 'catatan' => 'Pembersihan lahan selesai sesuai target.',
+                'status' => 'pending',
                 'created_at' => now(),
-                'updated_at' => now(),
+                'updated_at' => now(), 
             ],
             [
                 'work_item_id' => 2,
@@ -25,6 +26,7 @@ class ProgressReportSeeder extends Seeder
                 'tanggal_laporan' => '2026-10-15',
                 'persentase_progres' => 45.50,
                 'catatan' => 'Proses penggalian selesai, bersiap untuk pengecoran.',
+                'status' => 'pending',
                 'created_at' => now(),
                 'updated_at' => now(),
             ]

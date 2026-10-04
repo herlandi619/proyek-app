@@ -197,13 +197,22 @@ export default function Index({ auth, projects, filters }) {
                                                                 <span className="text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-1 rounded">
                                                                     Tgl: {report.tanggal_laporan}
                                                                 </span>
-                                                                <span className="text-xs text-gray-500 ml-2">Dilaporkan oleh: {report.user?.name}</span>
+                                                                <span className="text-xs text-gray-500 ml-2 block mt-1">Dilaporkan oleh: {report.user?.name}</span>
                                                             </div>
-                                                            <div className="text-right">
-                                                                <span className="block text-xl font-bold text-green-600">{report.persentase_progres}%</span>
-                                                                <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Progres</span>
+                                                            <div className="flex flex-col items-end">
+                                                                <div className="text-right mb-2">
+                                                                    <span className="block text-xl font-bold text-green-600">{report.persentase_progres}%</span>
+                                                                    <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Progres</span>
+                                                                </div>
+                                                                
+                                                                {/* Status Validasi */}
+                                                                <div>
+                                                                    {report.status === 'approved' && <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold uppercase tracking-wide">Disetujui</span>}
+                                                                    {report.status === 'rejected' && <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold uppercase tracking-wide">Ditolak</span>}
+                                                                    {(!report.status || report.status === 'pending') && <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-bold uppercase tracking-wide">Menunggu Validasi</span>}
+                                                                </div>
                                                             </div>
-                                                        </div>
+                                                        </div> 
                                                         
                                                         <p className="text-sm text-gray-700 mt-3 mb-3 p-3 bg-white rounded border border-gray-100 shadow-inner">
                                                             <span className="font-semibold block mb-1">Catatan:</span>
@@ -221,7 +230,6 @@ export default function Index({ auth, projects, filters }) {
                                                                             onClick={() => viewImage(photo.path_foto)}
                                                                             className="shrink-0 w-24 h-24 rounded border border-gray-200 overflow-hidden cursor-pointer hover:opacity-75 transition-opacity"
                                                                         >
-                                                                            {/* Pastikan symlink storage link laravel sudah dibuat (php artisan storage:link) */}
                                                                             <img 
                                                                                 src={`/storage/${photo.path_foto}`} 
                                                                                 alt="Progress" 

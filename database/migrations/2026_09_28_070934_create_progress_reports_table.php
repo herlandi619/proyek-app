@@ -18,6 +18,7 @@ return new class extends Migration
             $table->date('tanggal_laporan');
             $table->decimal('persentase_progres', 5, 2);
             $table->text('catatan')->nullable();
+            $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->timestamps();
         });
     }
